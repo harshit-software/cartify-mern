@@ -24,7 +24,6 @@ const register = async (req, res) => {
 
     const otp = Math.floor(10000 + Math.random() * 90000);
     const message = `Welcome to Cartify, ${name}! Your OTP for registration is ${otp}`;
-    console.log(message);
     await sendEmail(email, "Registration OTP for Cartify", message);
 
     // Saving the User in Database
@@ -72,7 +71,6 @@ const login = async (req, res) => {
 
     const otp = Math.floor(10000 + Math.random() * 90000);
     const message = `Welcome to Cartify, ${isUser.name}! Your OTP for login is ${otp}`;
-    console.log(message);
     await sendEmail(email, "Login OTP for Cartify", message);
 
     res.status(200).json({
@@ -100,23 +98,4 @@ const profile = (req, res) => {
   });
 };
 
-const allUsers = async (req, res) => {
-  try {
-    const users = await User.find({}).select("-password");
-    if (users.length === 0) {
-      return res
-        .status(400)
-        .json({ message: "No User or Admin is Registered" });
-    }
-    res.status(200).json({
-      success: true,
-      users,
-    });
-  } catch (error) {
-    return res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error.message });
-  }
-};
-
-module.exports = { register, login, profile, allUsers };
+module.exports = { register, login, profile };
