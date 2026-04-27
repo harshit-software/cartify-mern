@@ -1,55 +1,98 @@
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const redis = require("../config/redis");
 
 const { sendEmail } = require("../utils/sendEmail");
 
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "1d" });
+  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "30d" });
 };
 
 const register = async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
 
-    // Check User present in database already or not
     const exist = await User.findOne({ email });
     if (exist) {
-      return res.status(400).json({ message: "User already exist " });
+      return res.status(400).json({
+        success: false,
+        message: "User already exists",
+      });
     }
 
-    // Password Hashing before Storing Password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-    const otp = Math.floor(10000 + Math.random() * 90000);
-    const message = `Welcome to Cartify, ${name}! Your OTP for registration is ${otp}`;
-    await sendEmail(email, "Registration OTP for Cartify", message);
+    const otp = Math.floor(100000 + Math.random() * 900000);
 
-    // Saving the User in Database
-    const newUser = await User.create({
-      name,
-      email,
-      password: hashedPassword,
-      role,
+    // store temp user data in Redis
+    await redis.set(
+      `register:${email}`,
+      JSON.stringify({
+        name,
+        email,
+        password: hashedPassword,
+        role,
+      }),
+      "EX",
+      300,
+    );
+
+    await redis.set(`otp:register:${email}`, otp, "EX", 300);
+
+    await sendEmail(email, "Registration OTP", `Your OTP is ${otp}`);
+
+    res.status(200).json({
+      success: true,
+      message: "OTP sent for registration",
     });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+const verifyRegister = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    const storedOtp = await redis.get(`otp:register:${email}`);
+    const tempData = await redis.get(`register:${email}`);
+
+    if (!storedOtp || storedOtp !== otp || !tempData) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired OTP",
+      });
+    }
+
+    const userData = JSON.parse(tempData);
+
+    const newUser = await User.create(userData);
+
+    // cleanup
+    await redis.del(`otp:register:${email}`);
+    await redis.del(`register:${email}`);
 
     res.status(201).json({
       success: true,
-      message: "User Registration Successfully",
+      message: "Registration successful",
       user: {
         id: newUser._id,
-        name,
-        email,
+        name: newUser.name,
+        email: newUser.email,
         role: newUser.role,
         verified: newUser.verified,
       },
       token: generateToken(newUser._id),
     });
   } catch (error) {
-    return res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error.message });
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
   }
 };
 
@@ -68,10 +111,6 @@ const login = async (req, res) => {
     if (!isPassword) {
       return res.status(500).json({ message: "Invalid Email or Password" });
     }
-
-    const otp = Math.floor(10000 + Math.random() * 90000);
-    const message = `Welcome to Cartify, ${isUser.name}! Your OTP for login is ${otp}`;
-    await sendEmail(email, "Login OTP for Cartify", message);
 
     res.status(200).json({
       success: true,
@@ -98,4 +137,4 @@ const profile = (req, res) => {
   });
 };
 
-module.exports = { register, login, profile };
+module.exports = { register, verifyRegister, login, profile };
