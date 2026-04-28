@@ -21,7 +21,7 @@ app.use("/api/payment", paymentRoutes);
 app.use("/api/admin", adminRoutes);
 
 app.get("/", (req, res) => {
-  res.send("Ecommerce Backend Homepage");
+  res.send("Welcome to Cartify API");
 });
 
 module.exports = app;
