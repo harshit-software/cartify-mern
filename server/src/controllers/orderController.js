@@ -31,9 +31,15 @@ const createOrder = async (req, res) => {
 const getMyOrders = async (req, res) => {
   try {
     const order = await Order.find({ user: req.user._id });
-    res
-      .status(200)
-      .json({ success: true, message: "Order Fetched Successfully", order });
+    if (order) {
+      res
+        .status(200)
+        .json({ success: true, message: "Order Fetched Successfully", order });
+    } else {
+      return res
+        .status(404)
+        .json({ success: false, message: "Order Not Found" });
+    }
   } catch (error) {
     return res
       .status(500)
@@ -42,6 +48,17 @@ const getMyOrders = async (req, res) => {
 };
 const getOrderById = async (req, res) => {
   try {
+    const orderId = req.params.id;
+    const order = await Order.findOne({ _id: orderId });
+    if (order) {
+      res
+        .status(200)
+        .json({ success: true, message: "Order Fetched Successfully", order });
+    } else {
+      return res
+        .status(404)
+        .json({ success: false, message: "Order Not Found" });
+    }
   } catch (error) {
     return res
       .status(500)
@@ -51,9 +68,15 @@ const getOrderById = async (req, res) => {
 const getAllOrders = async (req, res) => {
   try {
     const order = await Order.find({});
-    res
-      .status(200)
-      .json({ success: true, message: "Order Fetched Successfully", order });
+    if (order) {
+      res
+        .status(200)
+        .json({ success: true, message: "Order Fetched Successfully", order });
+    } else {
+      return res
+        .status(404)
+        .json({ success: false, message: "Order Not Found" });
+    }
   } catch (error) {
     return res
       .status(500)
@@ -62,6 +85,21 @@ const getAllOrders = async (req, res) => {
 };
 const updateOrderStatus = async (req, res) => {
   try {
+    const orderId = req.params.id;
+    const order = await Order.findById({ _id: orderId });
+    if (order) {
+      order.status = "shipped";
+      await order.save();
+      res.json({
+        success: true,
+        messgae: "Order Status Updated Successfully",
+        order,
+      });
+    } else {
+      return res
+        .status(404)
+        .json({ success: false, message: "Order Not Found" });
+    }
   } catch (error) {
     return res
       .status(500)
@@ -70,6 +108,11 @@ const updateOrderStatus = async (req, res) => {
 };
 const deleteOrder = async (req, res) => {
   try {
+    const orderId = req.params.id;
+    const order = await Order.findByIdAndDelete({ _id: orderId });
+    res
+      .status(200)
+      .json({ success: true, message: "Order Deleted Successfully" });
   } catch (error) {
     return res
       .status(500)
