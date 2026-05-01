@@ -13,12 +13,6 @@ const {
 } = require("../controllers/productController");
 const upload = require("../middlewares/uploadImage");
 
-// router.get("/", showProducts);
-// router.get("/:id", showProductById);
-// router.post("/", protect, admin, createProduct);
-// router.put("/:id", protect, admin, updateProduct);
-// router.delete("/:id", protect, admin, deleteProduct);
-
 router
   .route("/")
   .get(showProducts)

@@ -4,121 +4,206 @@ const { sendEmail } = require("../utils/sendEmail");
 
 const createOrder = async (req, res) => {
   try {
-    const { product, quantity, amount, address } = req.body;
-    if (!product || !quantity || !amount || !address) {
-      return res.status().json({
+    const { product, quantity, address } = req.body;
+
+    if (!product || !quantity || !address) {
+      return res.status(400).json({
         success: false,
-        message: "All Fields Required",
+        message: "All fields are required",
       });
     }
+
+    const productData = await Product.findById(product);
+
+    if (!productData) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+      });
+    }
+
+    const totalAmount = productData.price * quantity;
 
     const order = await Order.create({
-      user: req.user.id,
-      products: { product, quantity },
-      totalAmount: Number(quantity * amount),
+      user: req.user._id,
+      products: {
+        product,
+        quantity,
+      },
+      totalAmount,
       address,
+      status: "pending",
     });
 
-    const messageToSend = `Dear ${req.user.name}, \n\nThank you for your order! Your Order has been successfully created with the following details: \n\n OrderId:${order._id}\n Total Amount: ${amount * quantity}\n Shipping Address: ${address}\n\n We will notify you once your order has been shipped, \n\nBest Regards, \nWith Cartify `;
+    const messageToSend = `Dear ${req.user.name},
+
+Your order has been successfully placed.
+
+Order ID: ${order._id}
+Total Amount: ${totalAmount}
+Address: ${address}
+
+Thank you for shopping with Cartify.`;
+
     await sendEmail(req.user.email, "Order Created", messageToSend);
-    res.status(201).json({ message: "Order Created Successfully", order });
+
+    res.status(201).json({
+      success: true,
+      message: "Order created successfully",
+      data: order,
+    });
   } catch (error) {
-    return res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error.message });
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
   }
 };
+
 const getMyOrders = async (req, res) => {
   try {
-    const order = await Order.find({ user: req.user._id });
-    if (order) {
-      res
-        .status(200)
-        .json({ success: true, message: "Order Fetched Successfully", order });
-    } else {
-      return res
-        .status(404)
-        .json({ success: false, message: "Order Not Found" });
-    }
+    const orders = await Order.find({ user: req.user._id }).sort({
+      createdAt: -1,
+    });
+
+    res.status(200).json({
+      success: true,
+      message:
+        orders.length === 0 ? "No orders found" : "Orders fetched successfully",
+      data: {
+        count: orders.length,
+        orders,
+      },
+    });
   } catch (error) {
-    return res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error.message });
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
   }
 };
+
 const getOrderById = async (req, res) => {
   try {
-    const orderId = req.params.id;
-    const order = await Order.findOne({ _id: orderId });
-    if (order) {
-      res
-        .status(200)
-        .json({ success: true, message: "Order Fetched Successfully", order });
-    } else {
-      return res
-        .status(404)
-        .json({ success: false, message: "Order Not Found" });
+    const order = await Order.findById(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found",
+      });
     }
+
+    // 🔐 Ownership check
+    if (order.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Order fetched successfully",
+      data: order,
+    });
   } catch (error) {
-    return res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error.message });
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
   }
 };
+
 const getAllOrders = async (req, res) => {
   try {
-    const order = await Order.find({});
-    if (order) {
-      res
-        .status(200)
-        .json({ success: true, message: "Order Fetched Successfully", order });
-    } else {
-      return res
-        .status(404)
-        .json({ success: false, message: "Order Not Found" });
-    }
+    const orders = await Order.find({}).sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      message: "All orders fetched successfully",
+      data: {
+        count: orders.length,
+        orders,
+      },
+    });
   } catch (error) {
-    return res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error.message });
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
   }
 };
+
 const updateOrderStatus = async (req, res) => {
   try {
-    const orderId = req.params.id;
-    const order = await Order.findById({ _id: orderId });
-    if (order) {
-      order.status = "shipped";
-      await order.save();
-      res.json({
-        success: true,
-        messgae: "Order Status Updated Successfully",
-        order,
+    const { status } = req.body;
+
+    if (!status) {
+      return res.status(400).json({
+        success: false,
+        message: "Status is required",
       });
-    } else {
-      return res
-        .status(404)
-        .json({ success: false, message: "Order Not Found" });
     }
+
+    const order = await Order.findById(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found",
+      });
+    }
+
+    order.status = status;
+
+    await order.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Order status updated successfully",
+      data: order,
+    });
   } catch (error) {
-    return res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error.message });
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
   }
 };
+
 const deleteOrder = async (req, res) => {
   try {
-    const orderId = req.params.id;
-    const order = await Order.findByIdAndDelete({ _id: orderId });
-    res
-      .status(200)
-      .json({ success: true, message: "Order Deleted Successfully" });
+    const order = await Order.findById(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found",
+      });
+    }
+
+    await order.deleteOne();
+
+    res.status(200).json({
+      success: true,
+      message: "Order deleted successfully",
+      data: null,
+    });
   } catch (error) {
-    return res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error.message });
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
   }
 };
+
 module.exports = {
   createOrder,
   getMyOrders,
