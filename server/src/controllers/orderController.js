@@ -26,26 +26,22 @@ const createOrder = async (req, res) => {
 
     const order = await Order.create({
       user: req.user._id,
-      products: {
-        product,
-        quantity,
-      },
+      products: [
+        {
+          product,
+          quantity,
+        },
+      ],
       totalAmount,
       address,
       status: "pending",
     });
 
-    const messageToSend = `Dear ${req.user.name},
-
-Your order has been successfully placed.
-
-Order ID: ${order._id}
-Total Amount: ${totalAmount}
-Address: ${address}
-
-Thank you for shopping with Cartify.`;
-
-    await sendEmail(req.user.email, "Order Created", messageToSend);
+    await sendEmail(
+      req.user.email,
+      "Order Created",
+      `Order ID: ${order._id}\nAmount: ${totalAmount}`,
+    );
 
     res.status(201).json({
       success: true,
@@ -143,10 +139,12 @@ const updateOrderStatus = async (req, res) => {
   try {
     const { status } = req.body;
 
-    if (!status) {
+    const allowedStatus = ["pending", "paid", "shipped", "delivered"];
+
+    if (!allowedStatus.includes(status)) {
       return res.status(400).json({
         success: false,
-        message: "Status is required",
+        message: "Invalid status",
       });
     }
 
@@ -160,7 +158,6 @@ const updateOrderStatus = async (req, res) => {
     }
 
     order.status = status;
-
     await order.save();
 
     res.status(200).json({

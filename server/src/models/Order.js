@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+
 const orderSchema = new mongoose.Schema(
   {
     user: {
@@ -6,6 +7,7 @@ const orderSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+
     products: [
       {
         product: {
@@ -16,16 +18,22 @@ const orderSchema = new mongoose.Schema(
         quantity: { type: Number, required: true, min: 1 },
       },
     ],
+
     totalAmount: { type: Number, required: true },
     address: { type: String, required: true },
+
+    // 🔥 PAYMENT FIELDS
     paymentId: { type: String },
+    isPaid: { type: Boolean, default: false },
+    paidAt: { type: Date },
+
     status: {
       type: String,
-      enum: ["pending", "shipped", "delivered"],
+      enum: ["pending", "paid", "shipped", "delivered"],
       default: "pending",
     },
   },
-  { timestamps: true },
+  { timestamps: true }
 );
 
 module.exports = mongoose.model("Order", orderSchema);

@@ -1,6 +1,7 @@
 const razorpay = require("../config/razorpay");
 const Order = require("../models/Order");
 const crypto = require("crypto");
+
 const createOrder = async (req, res) => {
   try {
     const { orderId } = req.body;
@@ -42,6 +43,7 @@ const createOrder = async (req, res) => {
     });
   }
 };
+
 const verifyPayment = async (req, res) => {
   try {
     const {
@@ -51,25 +53,12 @@ const verifyPayment = async (req, res) => {
       orderId,
     } = req.body;
 
-    if (
-      !razorpay_order_id ||
-      !razorpay_payment_id ||
-      !razorpay_signature ||
-      !orderId
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Missing payment details",
-      });
-    }
-
-    // 🔥 Generate expected signature
+    // 🔐 verify signature
     const generatedSignature = crypto
       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
       .update(razorpay_order_id + "|" + razorpay_payment_id)
       .digest("hex");
 
-    // ❌ If signature mismatch → reject
     if (generatedSignature !== razorpay_signature) {
       return res.status(400).json({
         success: false,
@@ -77,7 +66,7 @@ const verifyPayment = async (req, res) => {
       });
     }
 
-    // ✅ Update order as paid
+    // ✅ update order
     const order = await Order.findById(orderId);
 
     if (!order) {
@@ -87,9 +76,9 @@ const verifyPayment = async (req, res) => {
       });
     }
 
+    order.paymentId = razorpay_payment_id;
     order.isPaid = true;
     order.paidAt = Date.now();
-    order.paymentId = razorpay_payment_id;
     order.status = "paid";
 
     await order.save();
